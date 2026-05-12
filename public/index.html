@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Donation Box Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a"></div>
+    <div class="bg-shape bg-shape-b"></div>
+
+    <main class="container">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Rahman Foundation</p>
+          <h1>Donation Box Monthly Tracker</h1>
+          <p class="subtitle">Track collections, identify pending donors, and send reminder messages in one place.</p>
+        </div>
+
+        <div class="month-card">
+          <label for="monthPicker">Report Month</label>
+          <input id="monthPicker" type="month" />
+          <button id="refreshBtn" class="btn secondary">Refresh</button>
+        </div>
+      </header>
+
+      <section class="stats-grid">
+        <article class="stat">
+          <h3>Total Donation</h3>
+          <p id="totalAmount">Rs 0</p>
+        </article>
+        <article class="stat">
+          <h3>Total Donors</h3>
+          <p id="totalDonors">0</p>
+        </article>
+        <article class="stat">
+          <h3>Paid This Month</h3>
+          <p id="paidCount">0</p>
+        </article>
+        <article class="stat">
+          <h3>Pending This Month</h3>
+          <p id="pendingCount">0</p>
+        </article>
+      </section>
+
+      <section class="panel two-col">
+        <div>
+          <h2>Add or Update Collection</h2>
+          <form id="donationForm" class="form-grid">
+            <label>
+              Donor / Box
+              <select id="boxNo" required></select>
+            </label>
+            <label>
+              Amount (Rs)
+              <input id="amount" type="number" min="0" step="1" required />
+            </label>
+            <label>
+              Paid On
+              <input id="paidOn" type="date" />
+            </label>
+            <label>
+              Method
+              <select id="method">
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="bank">Bank</option>
+              </select>
+            </label>
+            <label>
+              Collected By Agent
+              <input id="agent" type="text" placeholder="Agent name" />
+            </label>
+            <label class="full-row">
+              Notes
+              <input id="notes" type="text" placeholder="Optional note" />
+            </label>
+            <div class="actions full-row">
+              <button type="submit" class="btn">Save Collection</button>
+            </div>
+          </form>
+          <p id="formMessage" class="message"></p>
+        </div>
+
+        <div>
+          <h2>Reminder Template</h2>
+          <textarea id="template" rows="8">Assalamu Alaikum {name}, this is a kind reminder for your donation box (Box #{boxNo}) for {month}. Please keep your donation ready. Thank you.</textarea>
+          <div class="actions">
+            <button id="copyTemplateBtn" class="btn secondary">Copy Template</button>
+            <a id="downloadCsv" class="btn secondary" href="#">Download Reminder CSV</a>
+          </div>
+          <p class="hint">Use placeholders: {name}, {boxNo}, {month}</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Donors Collected This Month</h2>
+          <input id="paidSearch" placeholder="Search paid donor by name, box, city" />
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Box</th>
+                <th>Name</th>
+                <th>City</th>
+                <th>Mobile</th>
+                <th>Amount</th>
+                <th>Paid On</th>
+                <th>Agent</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="paidTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Agent Monthly Performance</h2>
+          <a id="downloadAgentCsv" class="btn secondary" href="#">Download Agent Report CSV</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Collected Donors</th>
+                <th>Total Amount</th>
+                <th>Average Amount</th>
+                <th>Last Collection</th>
+              </tr>
+            </thead>
+            <tbody id="agentTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Pending Donors</h2>
+          <input id="pendingSearch" placeholder="Search pending donor by name, box, city" />
+        </div>
+        
+        <div class="tabs">
+          <button id="tabWithBox" class="tab-btn active">With Box Numbers</button>
+          <button id="tabWithoutBox" class="tab-btn">Without Box Numbers</button>
+        </div>
+
+        <div class="table-wrap" id="withBoxContainer">
+          <table>
+            <thead>
+              <tr>
+                <th>Box</th>
+                <th>Name</th>
+                <th>City</th>
+                <th>Mobile</th>
+                <th>Reminder</th>
+              </tr>
+            </thead>
+            <tbody id="pendingTableWithBox"></tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap" id="withoutBoxContainer" style="display: none;">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>City</th>
+                <th>Mobile</th>
+                <th>Reminder</th>
+              </tr>
+            </thead>
+            <tbody id="pendingTableWithoutBox"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
