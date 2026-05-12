@@ -24,6 +24,9 @@ function getPool() {
     pool = new Pool({
       connectionString: DATABASE_URL,
       ssl: IS_VERCEL ? { rejectUnauthorized: false } : false,
+      max: IS_VERCEL ? 2:10,
+      idleTimeoutMillis: IS_VERCEL ? 10000 : 30000,
+      connectionTimeoutMillis: 5000,
     });
   }
   return pool;
