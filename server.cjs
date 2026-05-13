@@ -24,7 +24,7 @@ function getPool() {
     pool = new Pool({
       connectionString: DATABASE_URL,
       ssl: IS_VERCEL ? { rejectUnauthorized: false } : false,
-      max: IS_VERCEL ? 2:10,
+      max: IS_VERCEL ? 2 : 10,
       idleTimeoutMillis: IS_VERCEL ? 10000 : 30000,
       connectionTimeoutMillis: 5000,
     });
@@ -644,11 +644,82 @@ app.get('/api/export/agents.csv', async (req, res) => {
     ];
 
     const csv = rows
-      .map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(','))
+      .map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(','))
       .join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="agent-report-${month}.csv"`);
+    return res.send(csv);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/export/zero-donation.csv', async (req, res) => {
+  try {
+    const month = normalizeText(req.query.month) || dayjs().format('YYYY-MM');
+    if (!isValidMonth(month)) {
+      return res.status(400).json({ error: 'Invalid month format. Use YYYY-MM.' });
+    }
+
+    const data = await buildMonthData(month);
+    const zeroRows = data.paid.filter((row) => Number(row.amount) === 0);
+    const rows = [
+      ['Box No', 'Name', 'City', 'Mobile', 'Amount', 'Paid On', 'Agent', 'Notes'],
+      ...zeroRows.map((row) => [
+        row.boxNo,
+        row.name,
+        row.city,
+        row.mobile,
+        Number(row.amount) || 0,
+        row.paidOn || '',
+        row.agent || 'Unassigned',
+        row.notes || '',
+      ]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="zero-donation-${month}.csv"`);
+    return res.send(csv);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/export/collected.csv', async (req, res) => {
+  try {
+    const month = normalizeText(req.query.month) || dayjs().format('YYYY-MM');
+    if (!isValidMonth(month)) {
+      return res.status(400).json({ error: 'Invalid month format. Use YYYY-MM.' });
+    }
+
+    const data = await buildMonthData(month);
+    const collectedRows = data.paid.filter((row) => Number(row.amount) > 0);
+    const rows = [
+      ['Box No', 'Name', 'City', 'Mobile', 'Amount', 'Paid On', 'Method', 'Agent', 'Notes'],
+      ...collectedRows.map((row) => [
+        row.boxNo,
+        row.name,
+        row.city,
+        row.mobile,
+        Number(row.amount) || 0,
+        row.paidOn || '',
+        row.method || 'cash',
+        row.agent || 'Unassigned',
+        row.notes || '',
+      ]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="collected-donations-${month}.csv"`);
     return res.send(csv);
   } catch (error) {
     return res.status(500).json({ error: error.message });
