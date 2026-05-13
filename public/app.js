@@ -9,14 +9,9 @@ const paidCountEl = document.getElementById('paidCount');
 const pendingCountEl = document.getElementById('pendingCount');
 
 const paidTable = document.getElementById('paidTable');
-const pendingTableWithBox = document.getElementById('pendingTableWithBox');
-const pendingTableWithoutBox = document.getElementById('pendingTableWithoutBox');
-const withBoxContainer = document.getElementById('withBoxContainer');
-const withoutBoxContainer = document.getElementById('withoutBoxContainer');
-const tabWithBox = document.getElementById('tabWithBox');
-const tabWithoutBox = document.getElementById('tabWithoutBox');
+const zeroDonationTable = document.getElementById('zeroDonationTable');
 const paidSearch = document.getElementById('paidSearch');
-const pendingSearch = document.getElementById('pendingSearch');
+const boxSearchInput = document.getElementById('boxSearch');
 
 const boxNoSelect = document.getElementById('boxNo');
 const amountInput = document.getElementById('amount');
@@ -29,12 +24,15 @@ const templateInput = document.getElementById('template');
 const copyTemplateBtn = document.getElementById('copyTemplateBtn');
 const downloadCsv = document.getElementById('downloadCsv');
 const downloadAgentCsv = document.getElementById('downloadAgentCsv');
+const downloadPaidCsv = document.getElementById('downloadPaidCsv');
+const downloadZeroCsv = document.getElementById('downloadZeroCsv');
 const agentTable = document.getElementById('agentTable');
 
 let latestData = null;
 let latestReminders = [];
 let latestAgentReport = null;
-let currentPendingTab = 'withBox';
+let sentWhatsAppIds = new Set();
+let allDonorOptions = [];
 
 function esc(value) {
   return String(value || '')
@@ -74,22 +72,38 @@ function renderSummary(data) {
 }
 
 function renderBoxOptions(data) {
-  const paidMap = new Map(data.paid.map((d) => [String(d.boxNo) || d.internalId, d]));
-  const all = [...data.paid, ...data.pending].sort((a, b) => {
+  allDonorOptions = [...data.paid, ...data.pending].sort((a, b) => {
     const aNum = Number(a.boxNo) || Infinity;
     const bNum = Number(b.boxNo) || Infinity;
     return aNum - bNum;
   });
 
-  boxNoSelect.innerHTML = all
+  renderFilteredBoxOptions(boxSearchInput?.value || '');
+}
+
+function renderFilteredBoxOptions(search = '') {
+  const selectedValue = boxNoSelect.value;
+  const term = search.trim().toLowerCase();
+
+  const filtered = !term
+    ? allDonorOptions
+    : allDonorOptions.filter((d) => {
+        const boxDisplay = d.boxNo || 'no-box';
+        const searchText = `${boxDisplay} ${d.name}`.toLowerCase();
+        return searchText.includes(term);
+      });
+
+  boxNoSelect.innerHTML = filtered
     .map((d) => {
-      const paid = paidMap.get(String(d.boxNo) || d.internalId);
       const boxDisplay = d.boxNo || '(No Box)';
-      const paidText = paid ? ` | Paid Rs ${Number(paid.amount || 0).toLocaleString('en-IN')}` : ' | Pending';
       const selectValue = d.boxNo || d.internalId || '';
-      return `<option value="${esc(selectValue)}">Box ${esc(boxDisplay)} - ${esc(d.name)}${esc(paidText)}</option>`;
+      return `<option value="${esc(selectValue)}">Box ${esc(boxDisplay)} - ${esc(d.name)}</option>`;
     })
     .join('');
+
+  if (selectedValue && filtered.some((d) => (d.boxNo || d.internalId || '') === selectedValue)) {
+    boxNoSelect.value = selectedValue;
+  }
 }
 
 function matchesSearch(rowText, term) {
@@ -98,6 +112,7 @@ function matchesSearch(rowText, term) {
 
 function renderPaidTable(search = '') {
   const rows = (latestData?.paid || []).filter((d) => {
+    if (Number(d.amount || 0) === 0) return false;
     if (!search.trim()) return true;
     const indexText = `${d.boxNo} ${d.name} ${d.city} ${d.area} ${d.mobile} ${d.agent || ''}`;
     return matchesSearch(indexText, search);
@@ -116,12 +131,54 @@ function renderPaidTable(search = '') {
         <td>${esc(d.agent || 'Unassigned')}</td>
         <td>
           <div class="small-links">
-            <a href="#" onclick="printReceipt('${esc(d.boxNo)}'); return false;">Print Receipt</a>
+            <button class="whatsapp-btn ${sentWhatsAppIds.has(d.internalId || d.boxNo) ? 'disabled' : ''}" onclick="sendWhatsAppMsg('${esc(d.internalId || d.boxNo)}', '${esc(d.name)}', '${esc(d.mobile)}'); return false;" ${sentWhatsAppIds.has(d.internalId || d.boxNo) ? 'disabled' : ''}>Send WhatsApp</button>
             <a href="#" onclick="removeDonation('${esc(d.internalId || d.boxNo)}'); return false;">Remove</a>
           </div>
         </td>
       </tr>
     `
+    )
+    .join('');
+}
+
+function renderZeroDonationTable(search = '') {
+  const rows = (latestData?.paid || []).filter((d) => {
+    if (Number(d.amount || 0) !== 0) return false;
+    if (!search.trim()) return true;
+    const indexText = `${d.boxNo || ''} ${d.name} ${d.city} ${d.area} ${d.mobile}`;
+    return matchesSearch(indexText, search);
+  });
+
+  if (rows.length === 0) {
+    zeroDonationTable.innerHTML = `
+      <tr>
+        <td colspan="7">No 0-donation records found for this month.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  zeroDonationTable.innerHTML = rows
+    .map(
+      (d) => {
+        const donorRef = d.internalId || d.boxNo;
+        return `
+      <tr>
+        <td>${esc(d.boxNo || '-')}</td>
+        <td>${esc(d.name)}</td>
+        <td>${esc(d.city)}</td>
+        <td>${esc(d.mobile || '-')}</td>
+        <td>0 / Nill</td>
+        <td>${esc(d.agent || 'Unassigned')}</td>
+        <td>
+          <div class="small-links">
+            ${d.mobile ? `<button class="whatsapp-btn ${sentWhatsAppIds.has(donorRef) ? 'disabled' : ''}" onclick="sendWhatsAppMsg('${esc(donorRef)}', '${esc(d.name)}', '${esc(d.mobile)}'); return false;" ${sentWhatsAppIds.has(donorRef) ? 'disabled' : ''}>Send WhatsApp</button>` : ''}
+            <a href="#" onclick="removeDonation('${esc(donorRef)}'); return false;">Remove</a>
+          </div>
+        </td>
+      </tr>
+    `;
+      }
     )
     .join('');
 }
@@ -135,7 +192,6 @@ function renderAgentTable() {
         <td>${esc(r.agent)}</td>
         <td>${Number(r.collectedCount || 0)}</td>
         <td>Rs ${Number(r.totalAmount || 0).toLocaleString('en-IN')}</td>
-        <td>Rs ${Number(r.averageAmount || 0).toLocaleString('en-IN')}</td>
         <td>${esc(r.lastPaidOn || '-')}</td>
       </tr>
     `
@@ -208,11 +264,13 @@ async function loadData() {
   renderSummary(donorData);
   renderBoxOptions(donorData);
   renderPaidTable(paidSearch.value);
-  renderPendingTable(pendingSearch.value);
+  renderZeroDonationTable(paidSearch.value);
   renderAgentTable();
 
   downloadCsv.href = `/api/export/reminders.csv?month=${month}&template=${template}`;
   downloadAgentCsv.href = `/api/export/agents.csv?month=${month}`;
+  downloadPaidCsv.href = `/api/export/collected.csv?month=${month}`;
+  downloadZeroCsv.href = `/api/export/zero-donation.csv?month=${month}`;
 }
 
 window.removeDonation = async function removeDonation(donorRef) {
@@ -240,64 +298,35 @@ window.copyReminder = async function copyReminder(boxNo) {
   setMessage(`Reminder copied for Box ${boxNo}.`);
 };
 
-window.printReceipt = async function printReceipt(boxNo) {
-  try {
-    if (!boxNo || boxNo.trim() === '') {
-      setMessage('Cannot print receipt: No box number assigned.', true);
-      return;
-    }
-    const receipt = await fetchJson(`/api/receipt/${boxNo}?month=${monthPicker.value}`);
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      setMessage('Pop-up blocked. Please allow pop-ups to print receipt.', true);
-      return;
-    }
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Receipt ${esc(receipt.receiptNo)}</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
-    .card { border: 2px solid #0b6e4f; border-radius: 8px; padding: 18px; max-width: 760px; }
-    h1 { margin: 0 0 6px; color: #0b6e4f; }
-    h2 { margin: 0 0 14px; font-size: 18px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; }
-    .label { width: 28%; font-weight: bold; background: #f9fafb; }
-    .row { display: flex; justify-content: space-between; margin-top: 14px; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>${esc(receipt.organization.name)}</h1>
-    <h2>${esc(receipt.organization.title)}</h2>
-    <div class="row"><span>Receipt No: ${esc(receipt.receiptNo)}</span><span>Month: ${esc(receipt.month)}</span></div>
-    <table>
-      <tr><td class="label">Box Number</td><td>${esc(receipt.donor.boxNo)}</td></tr>
-      <tr><td class="label">Donor Name</td><td>${esc(receipt.donor.name)}</td></tr>
-      <tr><td class="label">Address</td><td>${esc(receipt.donor.street)}, ${esc(receipt.donor.area)}, ${esc(receipt.donor.city)}</td></tr>
-      <tr><td class="label">Mobile</td><td>${esc(receipt.donor.mobile || '-')}</td></tr>
-      <tr><td class="label">Amount</td><td>Rs ${Number(receipt.payment.amount || 0).toLocaleString('en-IN')}</td></tr>
-      <tr><td class="label">Paid On</td><td>${esc(receipt.payment.paidOn || '-')}</td></tr>
-      <tr><td class="label">Method</td><td>${esc(receipt.payment.method || '-')}</td></tr>
-      <tr><td class="label">Collected By</td><td>${esc(receipt.payment.agent || 'Unassigned')}</td></tr>
-      <tr><td class="label">Notes</td><td>${esc(receipt.payment.notes || '-')}</td></tr>
-    </table>
-    <div class="row"><span>Issued At: ${new Date(receipt.issuedAt).toLocaleString()}</span><span>Authorized Signature: _____________________</span></div>
-  </div>
-</body>
-</html>`;
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  } catch (error) {
-    setMessage(error.message, true);
+window.sendWhatsAppMsg = async function sendWhatsAppMsg(donorId, name, mobile) {
+  if (!mobile || mobile.trim() === '') {
+    setMessage('No mobile number available for this donor.', true);
+    return;
   }
+  
+  const donor = (latestData?.paid || []).find((d) => (d.internalId || d.boxNo) === donorId)
+    || { name, boxNo: donorId, mobile };
+  
+  const month = monthPicker.value;
+  const template = (templateInput.value || 'Assalamu Alaikum 🌸\n\nAapke yahan rakha donation box aaj khola kiya gaya jisme ₹{amount} jama hue.\n\nAapse guzarish hai ke rozana thodi si Sadaqah (₹5, 10 ya 20) is donation box mein zarur dalein aur apne ghar ke afraad aur bachchon ko bhi is nek kaam mein hissa lene ki targeeb dein. 🤲\n\nAapki ye madad kisi bhooke ka khana, kisi bewa ka sahara aur kisi gareeb family ki madad ban sakti hai.\n\nSadaqah Allah ke gusse ko thanda karta hai aur ye rizq mein barkat, bimari me shifa, musibat se hifazat aur akhirat me sawaab ka zariya hai.\n\nJazakAllah Khair\n\nRF Sangli').trim();
+  const msg = template
+    .replaceAll('{name}', donor.name || 'Donor')
+    .replaceAll('{boxNo}', donor.boxNo || '')
+    .replaceAll('{month}', month)
+    .replaceAll('{amount}', Number(donor.amount || 0));
+  
+  const digits = String(mobile || '').replace(/\D/g, '');
+  let phone = digits;
+  if (digits.length === 10) phone = `91${digits}`;
+  if (!phone.startsWith('+')) phone = `+${phone}`;
+  
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  
+  sentWhatsAppIds.add(donorId);
+  renderPaidTable(paidSearch.value);
+  renderZeroDonationTable(paidSearch.value);
+  window.open(url, '_blank', 'width=600,height=700');
+  setMessage(`WhatsApp message sent to ${name}. Button disabled.`);
 };
 
 refreshBtn.addEventListener('click', async () => {
@@ -344,23 +373,9 @@ donationForm.addEventListener('submit', async (event) => {
 });
 
 paidSearch.addEventListener('input', () => renderPaidTable(paidSearch.value));
-pendingSearch.addEventListener('input', () => renderPendingTable(pendingSearch.value));
-
-tabWithBox.addEventListener('click', () => {
-  currentPendingTab = 'withBox';
-  tabWithBox.classList.add('active');
-  tabWithoutBox.classList.remove('active');
-  withBoxContainer.style.display = 'block';
-  withoutBoxContainer.style.display = 'none';
-});
-
-tabWithoutBox.addEventListener('click', () => {
-  currentPendingTab = 'withoutBox';
-  tabWithoutBox.classList.add('active');
-  tabWithBox.classList.remove('active');
-  withBoxContainer.style.display = 'none';
-  withoutBoxContainer.style.display = 'block';
-});
+if (boxSearchInput) {
+  boxSearchInput.addEventListener('input', () => renderFilteredBoxOptions(boxSearchInput.value));
+}
 
 templateInput.addEventListener('change', () => {
   downloadCsv.href = `/api/export/reminders.csv?month=${monthPicker.value}&template=${encodeURIComponent(templateInput.value.trim())}`;
@@ -371,7 +386,7 @@ templateInput.addEventListener('change', () => {
     const defaultMonth = await fetchJson('/api/month/default');
     monthPicker.value = defaultMonth.month;
     paidOnInput.value = todayIsoDate();
-    agentInput.value = 'Unassigned';
+    agentInput.value = 'TEST AGENT';
     await loadData();
   } catch (error) {
     setMessage(error.message, true);
