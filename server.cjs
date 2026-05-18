@@ -631,16 +631,28 @@ app.get('/api/export/agents.csv', async (req, res) => {
       return res.status(400).json({ error: 'Invalid month format. Use YYYY-MM.' });
     }
 
-    const report = await buildAgentPerformance(month);
+    const data = await buildMonthData(month);
+    const collectedRows = data.paid.filter((row) => Number(row.amount) > 0);
+    
+    // Group by date
+    const byDate = {};
+    collectedRows.forEach((row) => {
+      const date = normalizeText(row.paidOn) || 'Unknown';
+      if (!byDate[date]) {
+        byDate[date] = { date, amount: 0, agent: row.agent };
+      }
+      byDate[date].amount += Number(row.amount) || 0;
+    });
+    
     const rows = [
-      ['Agent', 'Collected Donors', 'Total Amount', 'Average Amount', 'Last Collection Date'],
-      ...report.rows.map((row) => [
-        row.agent,
-        row.collectedCount,
-        row.totalAmount,
-        row.averageAmount,
-        row.lastPaidOn,
-      ]),
+      ['Collection Date', 'Amount', 'Agent'],
+      ...Object.values(byDate)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map((row) => [
+          row.date,
+          row.amount,
+          row.agent || 'Unassigned',
+        ]),
     ];
 
     const csv = rows
@@ -648,7 +660,7 @@ app.get('/api/export/agents.csv', async (req, res) => {
       .join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="agent-report-${month}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="daily-collection-${month}.csv"`);
     return res.send(csv);
   } catch (error) {
     return res.status(500).json({ error: error.message });

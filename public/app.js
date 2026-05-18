@@ -132,7 +132,7 @@ function renderPaidTable(search = '') {
         <td>
           <div class="small-links">
             <button class="whatsapp-btn ${sentWhatsAppIds.has(d.internalId || d.boxNo) ? 'disabled' : ''}" onclick="sendWhatsAppMsg('${esc(d.internalId || d.boxNo)}', '${esc(d.name)}', '${esc(d.mobile)}'); return false;" ${sentWhatsAppIds.has(d.internalId || d.boxNo) ? 'disabled' : ''}>Send WhatsApp</button>
-            <a href="#" onclick="removeDonation('${esc(d.internalId || d.boxNo)}'); return false;">Remove</a>
+            <a href="#" class="disabled-link" title="Completed donations cannot be edited" onclick="return false;">Remove</a>
           </div>
         </td>
       </tr>
@@ -152,7 +152,7 @@ function renderZeroDonationTable(search = '') {
   if (rows.length === 0) {
     zeroDonationTable.innerHTML = `
       <tr>
-        <td colspan="7">No 0-donation records found for this month.</td>
+        <td colspan="8">No 0-donation records found for this month.</td>
       </tr>
     `;
     return;
@@ -169,6 +169,7 @@ function renderZeroDonationTable(search = '') {
         <td>${esc(d.city)}</td>
         <td>${esc(d.mobile || '-')}</td>
         <td>0 / Nill</td>
+        <td>${esc(d.paidOn || '-')}</td>
         <td>${esc(d.agent || 'Unassigned')}</td>
         <td>
           <div class="small-links">
@@ -184,15 +185,27 @@ function renderZeroDonationTable(search = '') {
 }
 
 function renderAgentTable() {
-  const rows = latestAgentReport?.rows || [];
+  const collectedRows = (latestData?.paid || []).filter((d) => Number(d.amount || 0) > 0);
+  
+  // Group by date and sort descending
+  const byDate = {};
+  collectedRows.forEach((row) => {
+    const date = row.paidOn || 'Unknown';
+    if (!byDate[date]) {
+      byDate[date] = { date, amount: 0, agent: row.agent };
+    }
+    byDate[date].amount += Number(row.amount) || 0;
+  });
+  
+  const rows = Object.values(byDate).sort((a, b) => new Date(b.date) - new Date(a.date));
+  
   agentTable.innerHTML = rows
     .map(
       (r) => `
       <tr>
-        <td>${esc(r.agent)}</td>
-        <td>${Number(r.collectedCount || 0)}</td>
-        <td>Rs ${Number(r.totalAmount || 0).toLocaleString('en-IN')}</td>
-        <td>${esc(r.lastPaidOn || '-')}</td>
+        <td>${esc(r.date)}</td>
+        <td>Rs ${Number(r.amount || 0).toLocaleString('en-IN')}</td>
+        <td>${esc(r.agent || 'Unassigned')}</td>
       </tr>
     `
     )

@@ -155,6 +155,7 @@ RF Sangli</textarea>
                 <th>City</th>
                 <th>Mobile</th>
                 <th>Amount</th>
+                <th>Paid On</th>
                 <th>Agent</th>
                 <th>Actions</th>
               </tr>
@@ -166,17 +167,16 @@ RF Sangli</textarea>
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Agent Monthly Performance</h2>
+          <h2>Daily Collection Report</h2>
           <a id="downloadAgentCsv" class="btn secondary" href="#">Download Agent Report CSV</a>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Collection Date</th>
+                <th>Amount (Rs)</th>
                 <th>Agent</th>
-                <th>Collected Donors</th>
-                <th>Total Amount</th>
-                <th>Last Collection</th>
               </tr>
             </thead>
             <tbody id="agentTable"></tbody>
