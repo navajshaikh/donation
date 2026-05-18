@@ -399,7 +399,7 @@ templateInput.addEventListener('change', () => {
     const defaultMonth = await fetchJson('/api/month/default');
     monthPicker.value = defaultMonth.month;
     paidOnInput.value = todayIsoDate();
-    agentInput.value = 'TEST AGENT';
+    agentInput.value = 'MOHSIN MUJAWAR';
     await loadData();
   } catch (error) {
     setMessage(error.message, true);
