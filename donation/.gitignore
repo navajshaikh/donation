@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+data/donations.json
+data/*.json
+*.log
+.DS_Store
+dist/
+build/

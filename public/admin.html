@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .admin-login { max-width: 400px; margin: 80px auto; padding: 32px; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px #0001; }
+    .admin-login h2 { margin-bottom: 24px; }
+    .admin-login label { display: block; margin-bottom: 8px; }
+    .admin-login input { width: 100%; margin-bottom: 16px; padding: 8px; }
+    .admin-login button { width: 100%; }
+    .admin-section { max-width: 900px; margin: 40px auto; }
+    .admin-section h2 { margin-top: 32px; }
+    .admin-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .admin-table th, .admin-table td { border: 1px solid #eee; padding: 8px; }
+    .admin-table th { background: #f8f8f8; }
+  </style>
+</head>
+<body>
+  <div id="adminLogin" class="admin-login">
+    <h2>Super Admin Login</h2>
+    <form id="adminLoginForm">
+      <label>Email
+        <input type="email" id="adminEmail" required placeholder="admin@rahman.local" />
+      </label>
+      <label>Password
+        <input type="password" id="adminPassword" required placeholder="Password" />
+      </label>
+      <button type="submit" class="btn">Login</button>
+      <div id="adminLoginMsg" style="color:#b91c1c;margin-top:8px;"></div>
+    </form>
+    <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+    <div style="text-align: center; margin-top: 16px;">
+      <p style="color: #666; margin: 0 0 12px 0; font-size: 14px;">Not a super admin?</p>
+      <a href="/public/index.html" class="btn secondary" style="display: inline-block; text-decoration: none; color: inherit; padding: 8px 16px;">Login as Foundation</a>
+    </div>
+  </div>
+  <div id="adminDashboard" class="admin-section" style="display:none;">
+    <h1>Super Admin Dashboard</h1>
+    <button id="logoutAdmin" class="btn secondary" style="float:right;">Logout</button>
+    <div id="adminContent"></div>
+  </div>
+  <script src="/admin.js"></script>
+</body>
+</html>

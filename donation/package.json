@@ -1,0 +1,21 @@
+{
+  "name": "donation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "dev": "node server.cjs",
+    "test": "echo \"No tests configured\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dayjs": "^1.11.20",
+    "express": "^5.2.1",
+    "pg": "^8.13.1",
+    "xlsx": "^0.18.5"
+  }
+}
