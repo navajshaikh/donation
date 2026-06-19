@@ -183,6 +183,16 @@ textarea {
   flex-wrap: wrap;
 }
 
+.daily-report-label {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.daily-report-date {
+  min-width: 170px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -243,6 +253,36 @@ th {
 .message {
   min-height: 1.2em;
   color: var(--brand-dark);
+}
+
+.daily-summary {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed #d9cfbd;
+}
+
+.daily-summary h3 {
+  margin: 0 0 10px;
+  color: var(--brand-dark);
+}
+
+.daily-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.stat.compact {
+  padding: 12px 14px;
+}
+
+.stat.compact h3 {
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+}
+
+.stat.compact p {
+  font-size: 1.15rem;
 }
 
 .hint {
@@ -326,6 +366,10 @@ th {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .daily-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 560px) {
@@ -334,6 +378,10 @@ th {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-summary-grid {
     grid-template-columns: 1fr;
   }
 }

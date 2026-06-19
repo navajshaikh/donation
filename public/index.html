@@ -168,19 +168,31 @@ RF Sangli</textarea>
       <section class="panel">
         <div class="panel-head">
           <h2>Daily Collection Report</h2>
-          <a id="downloadAgentCsv" class="btn secondary" href="#">Download Agent Report CSV</a>
+          <div class="actions">
+            <label for="dailyReportDate" class="daily-report-label">Report Date</label>
+            <input id="dailyReportDate" type="date" class="daily-report-date" />
+          </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Collection Date</th>
-                <th>Amount (Rs)</th>
-                <th>Agent</th>
-              </tr>
-            </thead>
-            <tbody id="agentTable"></tbody>
-          </table>
+        <div class="daily-summary" id="dailySummary">
+          <h3>Daily Summery - <span id="dailySummaryDate">-</span></h3>
+          <div class="daily-summary-grid">
+            <article class="stat compact">
+              <h3>Total Boxes Visited</h3>
+              <p id="dailyVisitedCount">0</p>
+            </article>
+            <article class="stat compact">
+              <h3>Zero Collection Boxes</h3>
+              <p id="dailyZeroCount">0</p>
+            </article>
+            <article class="stat compact">
+              <h3>Daily Collection Amount</h3>
+              <p id="dailyCollectionAmount">Rs 0</p>
+            </article>
+            <article class="stat compact">
+              <h3>WhatsApp Messages Sent</h3>
+              <p id="dailyWhatsAppCount">0</p>
+            </article>
+          </div>
         </div>
       </section>
     </main>
