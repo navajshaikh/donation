@@ -23,16 +23,21 @@ const notesInput = document.getElementById('notes');
 const templateInput = document.getElementById('template');
 const copyTemplateBtn = document.getElementById('copyTemplateBtn');
 const downloadCsv = document.getElementById('downloadCsv');
-const downloadAgentCsv = document.getElementById('downloadAgentCsv');
 const downloadPaidCsv = document.getElementById('downloadPaidCsv');
 const downloadZeroCsv = document.getElementById('downloadZeroCsv');
-const agentTable = document.getElementById('agentTable');
+const dailyReportDateInput = document.getElementById('dailyReportDate');
+const dailySummaryDateEl = document.getElementById('dailySummaryDate');
+const dailyVisitedCountEl = document.getElementById('dailyVisitedCount');
+const dailyZeroCountEl = document.getElementById('dailyZeroCount');
+const dailyCollectionAmountEl = document.getElementById('dailyCollectionAmount');
+const dailyWhatsAppCountEl = document.getElementById('dailyWhatsAppCount');
 
 let latestData = null;
 let latestReminders = [];
-let latestAgentReport = null;
 let sentWhatsAppIds = new Set();
 let allDonorOptions = [];
+const WHATSAPP_LOG_KEY = 'donation_whatsapp_sent_log_v1';
+let whatsappSentLog = loadWhatsAppSentLog();
 
 function esc(value) {
   return String(value || '')
@@ -48,6 +53,61 @@ function todayIsoDate() {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function normalizeDonorRef(donor) {
+  return String(donor?.internalId || donor?.boxNo || '').trim();
+}
+
+function loadWhatsAppSentLog() {
+  try {
+    const raw = localStorage.getItem(WHATSAPP_LOG_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function saveWhatsAppSentLog() {
+  localStorage.setItem(WHATSAPP_LOG_KEY, JSON.stringify(whatsappSentLog));
+}
+
+function getMonthWhatsAppSentIds(month) {
+  const monthLog = whatsappSentLog?.[month] || {};
+  const ids = new Set();
+  Object.values(monthLog).forEach((arr) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((id) => {
+      const clean = String(id || '').trim();
+      if (clean) ids.add(clean);
+    });
+  });
+  return ids;
+}
+
+function getDailyWhatsAppSentIds(month, date) {
+  const monthLog = whatsappSentLog?.[month] || {};
+  const dayLog = monthLog?.[date];
+  if (!Array.isArray(dayLog)) return new Set();
+  return new Set(dayLog.map((id) => String(id || '').trim()).filter(Boolean));
+}
+
+function trackWhatsAppSent(month, date, donorRef) {
+  if (!month || !date || !donorRef) return;
+  if (!whatsappSentLog[month]) {
+    whatsappSentLog[month] = {};
+  }
+  if (!Array.isArray(whatsappSentLog[month][date])) {
+    whatsappSentLog[month][date] = [];
+  }
+
+  const bucket = whatsappSentLog[month][date];
+  if (!bucket.includes(donorRef)) {
+    bucket.push(donorRef);
+    saveWhatsAppSentLog();
+  }
 }
 
 function setMessage(msg, isError = false) {
@@ -184,32 +244,28 @@ function renderZeroDonationTable(search = '') {
     .join('');
 }
 
-function renderAgentTable() {
-  const collectedRows = (latestData?.paid || []).filter((d) => Number(d.amount || 0) > 0);
-  
-  // Group by date and sort descending
-  const byDate = {};
-  collectedRows.forEach((row) => {
-    const date = row.paidOn || 'Unknown';
-    if (!byDate[date]) {
-      byDate[date] = { date, amount: 0, agent: row.agent };
-    }
-    byDate[date].amount += Number(row.amount) || 0;
-  });
-  
-  const rows = Object.values(byDate).sort((a, b) => new Date(b.date) - new Date(a.date));
-  
-  agentTable.innerHTML = rows
-    .map(
-      (r) => `
-      <tr>
-        <td>${esc(r.date)}</td>
-        <td>Rs ${Number(r.amount || 0).toLocaleString('en-IN')}</td>
-        <td>${esc(r.agent || 'Unassigned')}</td>
-      </tr>
-    `
-    )
-    .join('');
+function getDailyMetrics(date) {
+  const dailyRows = (latestData?.paid || []).filter((d) => (d.paidOn || '') === date);
+  const visited = dailyRows.length;
+  const zero = dailyRows.filter((row) => Number(row.amount || 0) === 0).length;
+  const amount = dailyRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+  const month = monthPicker.value;
+  const dailySent = getDailyWhatsAppSentIds(month, date).size;
+
+  return { visited, zero, amount, dailySent };
+}
+
+function renderDailySummary() {
+  const date = dailyReportDateInput.value || todayIsoDate();
+  if (dailySummaryDateEl) {
+    dailySummaryDateEl.textContent = date;
+  }
+
+  const metrics = getDailyMetrics(date);
+  dailyVisitedCountEl.textContent = String(metrics.visited);
+  dailyZeroCountEl.textContent = String(metrics.zero);
+  dailyCollectionAmountEl.textContent = `Rs ${Number(metrics.amount || 0).toLocaleString('en-IN')}`;
+  dailyWhatsAppCountEl.textContent = String(metrics.dailySent);
 }
 
 function renderPendingTable(search = '') {
@@ -264,24 +320,27 @@ async function loadData() {
   const month = monthPicker.value;
   const template = encodeURIComponent(templateInput.value.trim());
 
-  const [donorData, reminderData, agentReport] = await Promise.all([
+  const [donorData, reminderData] = await Promise.all([
     fetchJson(`/api/donors?month=${month}`),
     fetchJson(`/api/reminders?month=${month}&template=${template}`),
-    fetchJson(`/api/reports/agents?month=${month}`),
   ]);
 
   latestData = donorData;
   latestReminders = reminderData.reminders || [];
-  latestAgentReport = agentReport;
+  sentWhatsAppIds = getMonthWhatsAppSentIds(month);
+
+  if (!dailyReportDateInput.value || !dailyReportDateInput.value.startsWith(month)) {
+    const today = todayIsoDate();
+    dailyReportDateInput.value = today.startsWith(month) ? today : `${month}-01`;
+  }
 
   renderSummary(donorData);
   renderBoxOptions(donorData);
   renderPaidTable(paidSearch.value);
   renderZeroDonationTable(paidSearch.value);
-  renderAgentTable();
+  renderDailySummary();
 
   downloadCsv.href = `/api/export/reminders.csv?month=${month}&template=${template}`;
-  downloadAgentCsv.href = `/api/export/agents.csv?month=${month}`;
   downloadPaidCsv.href = `/api/export/collected.csv?month=${month}`;
   downloadZeroCsv.href = `/api/export/zero-donation.csv?month=${month}`;
 }
@@ -334,10 +393,15 @@ window.sendWhatsAppMsg = async function sendWhatsAppMsg(donorId, name, mobile) {
   if (!phone.startsWith('+')) phone = `+${phone}`;
   
   const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+
+  const donorRef = normalizeDonorRef(donor) || String(donorId || '').trim();
+  const messageDate = donor.paidOn || dailyReportDateInput.value || todayIsoDate();
+  trackWhatsAppSent(month, messageDate, donorRef);
   
-  sentWhatsAppIds.add(donorId);
+  sentWhatsAppIds.add(donorRef);
   renderPaidTable(paidSearch.value);
   renderZeroDonationTable(paidSearch.value);
+  renderDailySummary();
   window.open(url, '_blank', 'width=600,height=700');
   setMessage(`WhatsApp message sent to ${name}. Button disabled.`);
 };
@@ -346,6 +410,15 @@ refreshBtn.addEventListener('click', async () => {
   try {
     await loadData();
     setMessage('Data refreshed.');
+  } catch (error) {
+    setMessage(error.message, true);
+  }
+});
+
+monthPicker.addEventListener('change', async () => {
+  try {
+    await loadData();
+    setMessage(`Showing data for ${monthPicker.value}.`);
   } catch (error) {
     setMessage(error.message, true);
   }
@@ -392,6 +465,10 @@ if (boxSearchInput) {
 
 templateInput.addEventListener('change', () => {
   downloadCsv.href = `/api/export/reminders.csv?month=${monthPicker.value}&template=${encodeURIComponent(templateInput.value.trim())}`;
+});
+
+dailyReportDateInput.addEventListener('change', () => {
+  renderDailySummary();
 });
 
 (async function init() {
