@@ -39,6 +39,40 @@ let allDonorOptions = [];
 const WHATSAPP_LOG_KEY = 'donation_whatsapp_sent_log_v1';
 let whatsappSentLog = loadWhatsAppSentLog();
 
+const WHATSAPP_TEMPLATE_OPENED = `Assalamu Alaikum 🌸
+
+Date: {collectionDate}
+
+Aapke yahan rakha donation box aaj {collectorName} ki taraf se khola gaya, jisme ₹{collectedAmount} jama hue.
+
+Aapse guzarish hai ke rozana thodi si Sadaqah (₹5, ₹10 ya ₹20) is donation box mein zarur dalein aur apne ghar ke afraad aur bachchon ko bhi is nek kaam mein hissa lene ki targeeb dein. 🤲
+
+Aapki ye madad kisi bhooke ka khana, kisi bewa ka sahara aur kisi gareeb family ki madad ban sakti hai.
+
+Sadaqah Allah ke gusse ko thanda karta hai aur ye rizq mein barkat, bimari mein shifa, musibat se hifazat aur aakhirat mein sawaab ka zariya hai.
+
+JazakAllah Khair
+
+RF Sangli
+📞7030962065`;
+
+const WHATSAPP_TEMPLATE_NOT_OPENED = `Assalamu Alaikum 🌸
+
+Date: {collectionDate}
+
+Aaj {collectorName} aapke ghar visit par aaye the, lekin kisi wajah se aapke yahan rakha donation box khola nahi ja saka.
+
+Aapse guzarish hai ke rozana thodi si Sadaqah (₹5, ₹10 ya ₹20) is donation box mein zarur dalein aur apne ghar ke afraad aur bachchon ko bhi is nek kaam mein hissa lene ki targeeb dein. 🤲
+
+Aapki ye madad kisi bhooke ka khana, kisi bewa ka sahara aur kisi gareeb family ki madad ban sakti hai.
+
+Sadaqah Allah ke gusse ko thanda karta hai aur ye rizq mein barkat, bimari mein shifa, musibat se hifazat aur aakhirat mein sawaab ka zariya hai.
+
+JazakAllah Khair
+
+RF Sangli
+📞7030962065`;
+
 function esc(value) {
   return String(value || '')
     .replaceAll('&', '&amp;')
@@ -53,6 +87,47 @@ function todayIsoDate() {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function formatMessageDate(dateValue) {
+  const value = String(dateValue || '').trim();
+  if (!value) return todayIsoDate();
+  const parts = value.split('-');
+  if (parts.length !== 3) return value;
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+function resolveCollectorName(preferredName = '') {
+  const fromStorage = [
+    localStorage.getItem('collectorName'),
+    localStorage.getItem('userName'),
+    localStorage.getItem('agentName'),
+    localStorage.getItem('collector'),
+  ].find((v) => String(v || '').trim());
+
+  return String(preferredName || fromStorage || agentInput.value || 'Unassigned').trim();
+}
+
+function buildDonationWhatsAppMessage(donor) {
+  const amount = Number(donor?.amount || 0);
+  const isOpened = amount > 0;
+  const template = isOpened ? WHATSAPP_TEMPLATE_OPENED : WHATSAPP_TEMPLATE_NOT_OPENED;
+
+  return {
+    message: template
+      .replaceAll('{collectionDate}', formatMessageDate(donor?.paidOn || todayIsoDate()))
+      .replaceAll('{collectorName}', resolveCollectorName(donor?.agent))
+      .replaceAll('{collectedAmount}', Number(amount || 0).toLocaleString('en-IN')),
+    templateType: isOpened ? 'Donation Box Opened' : 'Donation Box Not Opened',
+  };
+}
+
+function normalizePhoneForWhatsApp(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 12 && digits.startsWith('91')) return digits;
+  return digits;
 }
 
 function normalizeDonorRef(donor) {
@@ -370,6 +445,30 @@ window.copyReminder = async function copyReminder(boxNo) {
   setMessage(`Reminder copied for Box ${boxNo}.`);
 };
 
+async function openDonationWhatsApp(donor, donorRef, source = 'manual') {
+  const phone = normalizePhoneForWhatsApp(donor?.mobile || '');
+  if (!phone) {
+    setMessage('No mobile number available for this donor.', true);
+    return false;
+  }
+
+  const { message, templateType } = buildDonationWhatsAppMessage(donor);
+  const url = `https://wa.me/+${phone}?text=${encodeURIComponent(message)}`;
+
+  const month = monthPicker.value;
+  const messageDate = donor.paidOn || dailyReportDateInput.value || todayIsoDate();
+  trackWhatsAppSent(month, messageDate, donorRef);
+
+  sentWhatsAppIds.add(donorRef);
+  renderPaidTable(paidSearch.value);
+  renderZeroDonationTable(paidSearch.value);
+  renderDailySummary();
+
+  window.open(url, '_blank', 'width=600,height=700');
+  setMessage(`${templateType} message sent to ${donor.name || 'donor'} (${source}). Button disabled.`);
+  return true;
+}
+
 window.sendWhatsAppMsg = async function sendWhatsAppMsg(donorId, name, mobile) {
   if (!mobile || mobile.trim() === '') {
     setMessage('No mobile number available for this donor.', true);
@@ -378,32 +477,8 @@ window.sendWhatsAppMsg = async function sendWhatsAppMsg(donorId, name, mobile) {
   
   const donor = (latestData?.paid || []).find((d) => (d.internalId || d.boxNo) === donorId)
     || { name, boxNo: donorId, mobile };
-  
-  const month = monthPicker.value;
-  const template = (templateInput.value || 'Assalamu Alaikum 🌸\n\nAapke yahan rakha donation box aaj khola kiya gaya jisme ₹{amount} jama hue.\n\nAapse guzarish hai ke rozana thodi si Sadaqah (₹5, 10 ya 20) is donation box mein zarur dalein aur apne ghar ke afraad aur bachchon ko bhi is nek kaam mein hissa lene ki targeeb dein. 🤲\n\nAapki ye madad kisi bhooke ka khana, kisi bewa ka sahara aur kisi gareeb family ki madad ban sakti hai.\n\nSadaqah Allah ke gusse ko thanda karta hai aur ye rizq mein barkat, bimari me shifa, musibat se hifazat aur akhirat me sawaab ka zariya hai.\n\nJazakAllah Khair\n\nRF Sangli').trim();
-  const msg = template
-    .replaceAll('{name}', donor.name || 'Donor')
-    .replaceAll('{boxNo}', donor.boxNo || '')
-    .replaceAll('{month}', month)
-    .replaceAll('{amount}', Number(donor.amount || 0));
-  
-  const digits = String(mobile || '').replace(/\D/g, '');
-  let phone = digits;
-  if (digits.length === 10) phone = `91${digits}`;
-  if (!phone.startsWith('+')) phone = `+${phone}`;
-  
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-
   const donorRef = normalizeDonorRef(donor) || String(donorId || '').trim();
-  const messageDate = donor.paidOn || dailyReportDateInput.value || todayIsoDate();
-  trackWhatsAppSent(month, messageDate, donorRef);
-  
-  sentWhatsAppIds.add(donorRef);
-  renderPaidTable(paidSearch.value);
-  renderZeroDonationTable(paidSearch.value);
-  renderDailySummary();
-  window.open(url, '_blank', 'width=600,height=700');
-  setMessage(`WhatsApp message sent to ${name}. Button disabled.`);
+  await openDonationWhatsApp(donor, donorRef, 'manual');
 };
 
 refreshBtn.addEventListener('click', async () => {
@@ -432,13 +507,16 @@ copyTemplateBtn.addEventListener('click', async () => {
 donationForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
+  const systemDate = todayIsoDate();
+  const collectorName = resolveCollectorName();
+
   const payload = {
     boxNo: boxNoSelect.value,
     month: monthPicker.value,
     amount: Number(amountInput.value),
-    paidOn: paidOnInput.value,
+    paidOn: systemDate,
     method: methodInput.value,
-    agent: agentInput.value,
+    agent: collectorName,
     notes: notesInput.value,
   };
 
@@ -452,7 +530,17 @@ donationForm.addEventListener('submit', async (event) => {
     setMessage(`Saved collection for Box ${payload.boxNo}.`);
     amountInput.value = '';
     notesInput.value = '';
+    paidOnInput.value = systemDate;
+    agentInput.value = collectorName;
     await loadData();
+
+    const savedDonor = (latestData?.paid || []).find(
+      (d) => (d.internalId || d.boxNo) === payload.boxNo || (d.boxNo || '') === payload.boxNo
+    );
+    if (savedDonor) {
+      const donorRef = normalizeDonorRef(savedDonor) || String(payload.boxNo || '').trim();
+      await openDonationWhatsApp(savedDonor, donorRef, 'auto');
+    }
   } catch (error) {
     setMessage(error.message, true);
   }
@@ -476,7 +564,8 @@ dailyReportDateInput.addEventListener('change', () => {
     const defaultMonth = await fetchJson('/api/month/default');
     monthPicker.value = defaultMonth.month;
     paidOnInput.value = todayIsoDate();
-    agentInput.value = 'MOHSIN MUJAWAR';
+    paidOnInput.readOnly = true;
+    agentInput.value = resolveCollectorName('MOHSIN MUJAWAR');
     await loadData();
   } catch (error) {
     setMessage(error.message, true);
