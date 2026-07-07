@@ -508,13 +508,14 @@ donationForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const systemDate = todayIsoDate();
+  const selectedDate = String(paidOnInput.value || '').trim() || systemDate;
   const collectorName = resolveCollectorName();
 
   const payload = {
     boxNo: boxNoSelect.value,
     month: monthPicker.value,
     amount: Number(amountInput.value),
-    paidOn: systemDate,
+    paidOn: selectedDate,
     method: methodInput.value,
     agent: collectorName,
     notes: notesInput.value,
@@ -564,7 +565,6 @@ dailyReportDateInput.addEventListener('change', () => {
     const defaultMonth = await fetchJson('/api/month/default');
     monthPicker.value = defaultMonth.month;
     paidOnInput.value = todayIsoDate();
-    paidOnInput.readOnly = true;
     agentInput.value = resolveCollectorName('MOHSIN MUJAWAR');
     await loadData();
   } catch (error) {
