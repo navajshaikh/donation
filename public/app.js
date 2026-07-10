@@ -535,13 +535,7 @@ donationForm.addEventListener('submit', async (event) => {
     agentInput.value = collectorName;
     await loadData();
 
-    const savedDonor = (latestData?.paid || []).find(
-      (d) => (d.internalId || d.boxNo) === payload.boxNo || (d.boxNo || '') === payload.boxNo
-    );
-    if (savedDonor) {
-      const donorRef = normalizeDonorRef(savedDonor) || String(payload.boxNo || '').trim();
-      await openDonationWhatsApp(savedDonor, donorRef, 'auto');
-    }
+    
   } catch (error) {
     setMessage(error.message, true);
   }
